@@ -1,11 +1,10 @@
 GO=GO111MODULE=on go
-GOIMPORTS=goimports
 
 .PHONY: test
 test:
 	$(GO) test ./pkg/...
 
-.PHONY: imports
-imports:
-	$(GOIMPORTS) -w .
+.PHONY: lint
+lint:
+	golangci-lint run --fix --disable-all -E goimports
 
