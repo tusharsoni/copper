@@ -2,63 +2,66 @@
 package copper
 
 import (
-	"github.com/tusharsoni/copper/chttp"
-	"github.com/tusharsoni/copper/clogger"
+	"context"
+	"log"
+
 	"github.com/tusharsoni/copper/crandom"
 	"go.uber.org/fx"
 )
 
-// NewHTTPApp creates a new copper app that starts a http server.
-// It accepts additional modules as fx.Option that can be registered in the app.
-// Returns *fx.App that be started using the Run() method.
-func NewHTTPApp(opts ...fx.Option) *fx.App {
-	combined := append([]fx.Option{
-		chttp.Fx,
+type ModuleParams fx.In
+type Module fx.Out
 
-		fx.Invoke(crandom.Seed),
-		fx.Invoke(chttp.Register),
-	}, opts...)
-
-	return fx.New(combined...)
+type App struct {
+	opts []fx.Option
 }
 
-type HTTPAppParams struct {
-	Logger            clogger.Logger
-	Routes            []chttp.Route
-	GlobalMiddlewares []chttp.MiddlewareFunc
-	Config            chttp.Config
+func New() *App {
+	return &App{
+		opts: []fx.Option{
+			fx.Invoke(crandom.Seed),
+		},
+	}
 }
 
-func RunHTTPApp(p HTTPAppParams) {
-	var (
-		router = chttp.NewRouter(chttp.RouterParams{
-			Routes: append(
-				p.Routes,
-				chttp.NewHealthRoute(chttp.HealthRouteParams{}).Route,
-			),
-			GlobalMiddlewareFuncs: append(
-				p.GlobalMiddlewares,
-				chttp.NewRequestLogger(p.Logger).GlobalMiddlewareFunc,
-			),
-			Logger: p.Logger,
-		})
-		server = chttp.NewServer(chttp.ServerParams{
-			Logger: p.Logger,
-			Config: p.Config,
-		})
-	)
+func (a *App) AddModules(constructors ...interface{}) {
+	for i := range constructors {
+		a.opts = append(a.opts, fx.Provide(constructors[i]))
+	}
+}
 
-	crandom.Seed()
+func (a *App) AddConfigs(configs ...interface{}) {
+	for i := range configs {
+		a.opts = append(a.opts, fx.Supply(configs[i]))
+	}
+}
 
-	err := chttp.Register(server, router)
-	if err != nil {
-		p.Logger.Error("Failed to register http router to the server", err)
-		return
+func (a *App) Start(funcs ...interface{}) {
+	for i := range funcs {
+		a.opts = append(a.opts, fx.Invoke(funcs[i]))
 	}
 
-	err = server.ListenAndServe()
-	if err != nil {
-		p.Logger.Error("Failed to start the server", err)
-		return
+	fx.New(a.opts...).Run()
+}
+
+func (a *App) Run(funcs ...interface{}) {
+	for i := range funcs {
+		a.opts = append(a.opts, fx.Invoke(funcs[i]))
+	}
+
+	fxApp := fx.New(a.opts...)
+
+	startCtx, cancel := context.WithTimeout(context.Background(), fxApp.StartTimeout())
+	defer cancel()
+
+	if err := fxApp.Start(startCtx); err != nil {
+		log.Fatalf("ERROR\t\tFailed to start: %v", err)
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), fxApp.StopTimeout())
+	defer cancel()
+
+	if err := fxApp.Stop(stopCtx); err != nil {
+		log.Fatalf("ERROR\t\tFailed to stop cleanly: %v", err)
 	}
 }

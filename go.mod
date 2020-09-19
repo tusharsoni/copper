@@ -13,9 +13,9 @@ require (
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/stretchr/testify v1.5.1
-	go.uber.org/dig v1.6.0 // indirect
-	go.uber.org/fx v1.8.0
+	go.uber.org/fx v1.13.1
 	go.uber.org/goleak v0.10.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	gorm.io/driver/postgres v1.0.0
 	gorm.io/gorm v1.20.0
