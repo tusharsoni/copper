@@ -2,31 +2,23 @@ package chttp
 
 import (
 	"net/http"
-
-	"go.uber.org/fx"
 )
 
-// HealthRouteParams holds the dependencies needed to create the Health route using NewHealthRoute.
-type HealthRouteParams struct {
-	fx.In
+func NewHealthRouter(config Config) Router {
+	ro := healthRouter{}
 
-	Config Config `optional:"true"`
+	return NewRouter([]Route{
+		{
+			MiddlewareFuncs: []MiddlewareFunc{},
+			Path:            config.HealthPath,
+			Methods:         []string{http.MethodGet},
+			Handler:         http.HandlerFunc(ro.Handle),
+		},
+	})
 }
 
-// NewHealthRoute provides a route that responds OK to signify the health of the server.
-func NewHealthRoute(p HealthRouteParams) RouteResult {
-	config := p.Config
-	if !config.isValid() {
-		config = GetDefaultConfig()
-	}
+type healthRouter struct{}
 
-	route := Route{
-		MiddlewareFuncs: []MiddlewareFunc{},
-		Path:            config.HealthPath,
-		Methods:         []string{http.MethodGet},
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("OK"))
-		}),
-	}
-	return RouteResult{Route: route}
+func (ro *healthRouter) Handle(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte("OK"))
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/tusharsoni/copper/clogger"
 )
 
-func NewRequestLogger(logger clogger.Logger) GlobalMiddlewareFuncResult {
-	var mw = func(next http.Handler) http.Handler {
+func NewRequestLogger(logger clogger.Logger) MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var (
 				tags     = make(map[string]interface{})
@@ -30,10 +30,6 @@ func NewRequestLogger(logger clogger.Logger) GlobalMiddlewareFuncResult {
 
 			logger.WithTags(tags).Info(fmt.Sprintf("%s %s %d", r.Method, r.URL.Path, loggerRw.statusCode))
 		})
-	}
-
-	return GlobalMiddlewareFuncResult{
-		GlobalMiddlewareFunc: mw,
 	}
 }
 

@@ -5,26 +5,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"go.uber.org/fx"
 )
-
-// MiddlewareFunc can be used to create a middleware that can be used on a route.
-type MiddlewareFunc func(http.Handler) http.Handler
-
-// RouteResult can be provided to the application container to register a route when starting the http server.
-type RouteResult struct {
-	fx.Out
-
-	Route Route `group:"routes"`
-}
-
-// GlobalMiddlewareFuncResult can be provided to the application container to register middlewares to all routes.
-type GlobalMiddlewareFuncResult struct {
-	fx.Out
-
-	GlobalMiddlewareFunc MiddlewareFunc `group:"global_middleware_funcs"`
-}
 
 // Route represents a single path that the http server is accepting requests on.
 // The route can be configured with middleware functions.
