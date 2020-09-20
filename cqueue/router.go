@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
-	"go.uber.org/fx"
 )
 
 type Router struct {
@@ -17,34 +16,26 @@ type Router struct {
 }
 
 type RouterParams struct {
-	fx.In
-
 	RW     chttp.ReaderWriter
 	Logger clogger.Logger
 
 	Svc Svc
 }
 
-func NewRouter(p RouterParams) *Router {
-	return &Router{
+func NewRouter(p RouterParams) chttp.Router {
+	ro := &Router{
 		rw:     p.RW,
 		logger: p.Logger,
 		svc:    p.Svc,
 	}
-}
 
-func (ro *Router) Routes() []chttp.Route {
-	return []chttp.Route{
-		NewGetTaskRoute(ro).Route,
-	}
-}
-
-func NewGetTaskRoute(ro *Router) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:    "/api/queue/tasks/{uuid}",
-		Methods: []string{http.MethodGet},
-		Handler: http.HandlerFunc(ro.HandleGetTask),
-	}}
+	return chttp.NewRouter([]chttp.Route{
+		{
+			Path:    "/api/queue/tasks/{uuid}",
+			Methods: []string{http.MethodGet},
+			Handler: http.HandlerFunc(ro.HandleGetTask),
+		},
+	})
 }
 
 func (ro *Router) HandleGetTask(w http.ResponseWriter, r *http.Request) {

@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tusharsoni/copper/cerror"
-	"go.uber.org/fx"
 )
 
 type QueueTaskParams struct {
@@ -24,8 +23,6 @@ type Svc interface {
 }
 
 type SvcParams struct {
-	fx.In
-
 	Repo   Repo
 	Config Config
 }

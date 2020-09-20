@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/tusharsoni/copper"
+
 	"github.com/tusharsoni/copper/clogger"
-	"go.uber.org/fx"
 )
 
 type StartBackgroundWorkersParams struct {
-	fx.In
+	copper.StartFuncParams
 
 	Workers []Worker `group:"cqueue/workers"`
 	Queue   Svc
@@ -23,7 +24,7 @@ func StartBackgroundWorkers(p StartBackgroundWorkersParams) {
 }
 
 type WorkerResult struct {
-	fx.Out
+	copper.Module
 
 	Worker Worker `group:"cqueue/workers"`
 }
