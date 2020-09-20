@@ -12,6 +12,8 @@ import (
 type ModuleParams fx.In
 type Module fx.Out
 
+type StartFuncParams fx.In
+
 type App struct {
 	opts []fx.Option
 }
@@ -19,6 +21,7 @@ type App struct {
 func New() *App {
 	return &App{
 		opts: []fx.Option{
+			fx.Provide(newLifecycle),
 			fx.Invoke(crandom.Seed),
 		},
 	}
