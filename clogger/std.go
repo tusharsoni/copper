@@ -9,32 +9,26 @@ import (
 	"github.com/tusharsoni/copper/cerror"
 )
 
-type StdLoggerParams struct {
+type NewParams struct {
 	fx.In
 
-	Config StdConfig `optional:"true"`
+	Config Config `optional:"true"`
 }
 
-type stdLogger struct {
-	tags   map[string]interface{}
-	config StdConfig
-}
-
-func NewStdLogger() Logger {
-	return NewStdLoggerWithParams(StdLoggerParams{
-		Config: StdConfig{},
-	})
-}
-
-func NewStdLoggerWithParams(p StdLoggerParams) Logger {
+func New(p NewParams) Logger {
 	if !p.Config.isValid() {
-		p.Config = GetDefaultStdConfig()
+		p.Config = GetDefaultConfig()
 	}
 
 	return &stdLogger{
 		tags:   make(map[string]interface{}),
 		config: p.Config,
 	}
+}
+
+type stdLogger struct {
+	tags   map[string]interface{}
+	config Config
 }
 
 func (s *stdLogger) WithTags(tags map[string]interface{}) Logger {
