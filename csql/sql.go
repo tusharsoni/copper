@@ -7,17 +7,13 @@ import (
 
 	"github.com/tusharsoni/copper/clogger"
 
-	"go.uber.org/fx"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 type GormDBParams struct {
-	fx.In
-
-	Config    Config
-	Logger    clogger.Logger
-	Lifecycle fx.Lifecycle `optional:"true"`
+	Config Config
+	Logger clogger.Logger
 }
 
 func NewGormDB(p GormDBParams) (*gorm.DB, error) {

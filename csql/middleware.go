@@ -13,51 +13,27 @@ import (
 	"gorm.io/gorm"
 )
 
-// DBTxnMiddleware provides a middleware that wraps the http request in a database transaction. If the response status
-// code is between 100-399, the transaction is committed, else a rollback is performed.
-type DBTxnMiddleware interface {
-	WrapInTxn(next http.Handler) http.Handler
-}
+func NewTxnMiddleware(db *gorm.DB, logger clogger.Logger) chttp.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			txn := db.Begin()
+			ctx := context.WithValue(r.Context(), connCtxKey, txn)
 
-type dbTxnMiddleware struct {
-	db     *gorm.DB
-	logger clogger.Logger
-}
+			rw := &txnrw{
+				internal: w,
+				db:       txn,
+				logger:   logger,
+			}
 
-func NewDBTxnMiddleware(db *gorm.DB, logger clogger.Logger) chttp.MiddlewareFunc {
-	mw := dbTxnMiddleware{
-		db:     db,
-		logger: logger,
+			next.ServeHTTP(rw, r.WithContext(ctx))
+
+			err := rw.commitIfNeeded()
+			if err != nil {
+				logger.Error("Failed to commit db transaction", err)
+				return
+			}
+		})
 	}
-
-	return mw.WrapInTxn
-}
-
-func NewDBTxnMiddlewareFx(db *gorm.DB, logger clogger.Logger) chttp.GlobalMiddlewareFuncResult {
-	return chttp.GlobalMiddlewareFuncResult{
-		GlobalMiddlewareFunc: NewDBTxnMiddleware(db, logger),
-	}
-}
-
-func (m *dbTxnMiddleware) WrapInTxn(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		txn := m.db.Begin()
-		ctx := context.WithValue(r.Context(), connCtxKey, txn)
-
-		rw := &txnrw{
-			internal: w,
-			db:       txn,
-			logger:   m.logger,
-		}
-
-		next.ServeHTTP(rw, r.WithContext(ctx))
-
-		err := rw.commitIfNeeded()
-		if err != nil {
-			m.logger.Error("Failed to commit db transaction", err)
-			return
-		}
-	})
 }
 
 type txnrw struct {
