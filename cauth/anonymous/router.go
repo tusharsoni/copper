@@ -5,7 +5,6 @@ import (
 
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
-	"go.uber.org/fx"
 )
 
 type Router struct {
@@ -16,29 +15,26 @@ type Router struct {
 }
 
 type RouterParams struct {
-	fx.In
-
 	RW     chttp.ReaderWriter
 	Logger clogger.Logger
 
 	Svc Svc
 }
 
-func NewRouter(p RouterParams) *Router {
-	return &Router{
+func NewRouter(p RouterParams) chttp.Router {
+	ro := Router{
 		rw:     p.RW,
 		logger: p.Logger,
-
-		svc: p.Svc,
+		svc:    p.Svc,
 	}
-}
 
-func NewCreateSessionRoute(ro *Router) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:    "/api/auth/anonymous/create",
-		Methods: []string{http.MethodPost},
-		Handler: http.HandlerFunc(ro.HandleCreateSession),
-	}}
+	return chttp.NewRouter([]chttp.Route{
+		{
+			Path:    "/api/auth/anonymous/create",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.HandleCreateSession),
+		},
+	})
 }
 
 func (ro *Router) HandleCreateSession(w http.ResponseWriter, r *http.Request) {

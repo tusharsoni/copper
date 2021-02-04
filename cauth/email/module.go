@@ -1,6 +1,7 @@
 package email
 
 import (
+	"github.com/tusharsoni/copper"
 	"github.com/tusharsoni/copper/cauth"
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
@@ -9,44 +10,42 @@ import (
 )
 
 type Module struct {
+	copper.Module
+
 	Svc    Svc
-	Routes []chttp.Route
+	Router chttp.Router
 }
 
-type NewModuleParams struct {
-	Auth   cauth.Svc
-	Mailer cmailer.Mailer
-	Logger clogger.Logger
-	Config Config
+type NewParams struct {
+	copper.ModuleParams
+
+	Auth      cauth.Svc
+	Mailer    cmailer.Mailer
+	Logger    clogger.Logger
+	Config    Config
+	RW        chttp.ReaderWriter
+	SessionMW cauth.SessionMiddleware
 
 	DB *gorm.DB
 }
 
-func NewModule(p NewModuleParams) *Module {
-	var (
-		svc = NewSvc(SvcParams{
-			Auth:   p.Auth,
-			Repo:   NewSQLRepo(p.DB),
-			Mailer: p.Mailer,
-			Config: p.Config,
-			Logger: p.Logger,
-		})
+func New(p NewParams) Module {
+	svc := NewSvc(SvcParams{
+		Auth:   p.Auth,
+		Repo:   NewSQLRepo(p.DB),
+		Mailer: p.Mailer,
+		Config: p.Config,
+		Logger: p.Logger,
+	})
 
-		router = NewRouter(RouterParams{
-			RW:     chttp.NewJSONReaderWriter(p.Logger),
-			Logger: p.Logger,
-			Auth:   svc,
-			AuthMW: cauth.NewAuthMiddleware(cauth.MiddlewareParams{
-				RW:     chttp.NewJSONReaderWriter(p.Logger),
-				Svc:    p.Auth,
-				Logger: p.Logger,
-			}),
-			Config: p.Config,
-		})
-	)
-
-	return &Module{
-		Svc:    svc,
-		Routes: router.Routes(),
+	return Module{
+		Svc: svc,
+		Router: NewRouter(NewRouterParams{
+			RW:        p.RW,
+			Logger:    p.Logger,
+			Auth:      svc,
+			SessionMW: chttp.MiddlewareFunc(p.SessionMW),
+			Config:    p.Config,
+		}),
 	}
 }

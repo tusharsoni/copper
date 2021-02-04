@@ -5,47 +5,41 @@ import (
 
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
-	"go.uber.org/fx"
 )
+
+type NewRouterParams struct {
+	Auth   Svc
+	RW     chttp.ReaderWriter
+	Logger clogger.Logger
+}
+
+func NewRouter(p NewRouterParams) chttp.Router {
+	ro := &Router{
+		rw:     p.RW,
+		logger: p.Logger,
+
+		auth: p.Auth,
+	}
+
+	return chttp.NewRouter([]chttp.Route{
+		{
+			Path:    "/api/auth/email-otp/signup",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.HandleSignup),
+		},
+		{
+			Path:    "/api/auth/email-otp/login",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.HandleLogin),
+		},
+	})
+}
 
 type Router struct {
 	rw     chttp.ReaderWriter
 	logger clogger.Logger
 
 	auth Svc
-}
-
-type RouterParams struct {
-	fx.In
-
-	RW     chttp.ReaderWriter
-	Logger clogger.Logger
-
-	Auth Svc
-}
-
-func NewRouter(p RouterParams) *Router {
-	return &Router{
-		rw:     p.RW,
-		logger: p.Logger,
-
-		auth: p.Auth,
-	}
-}
-
-func (ro *Router) Routes() []chttp.Route {
-	return []chttp.Route{
-		NewSignup(ro).Route,
-		NewLogin(ro).Route,
-	}
-}
-
-func NewSignup(ro *Router) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:    "/api/auth/email-otp/signup",
-		Methods: []string{http.MethodPost},
-		Handler: http.HandlerFunc(ro.HandleSignup),
-	}}
 }
 
 func (ro *Router) HandleSignup(w http.ResponseWriter, r *http.Request) {
@@ -68,14 +62,6 @@ func (ro *Router) HandleSignup(w http.ResponseWriter, r *http.Request) {
 		"user_uuid":     c.UserUUID,
 		"session_token": token,
 	})
-}
-
-func NewLogin(ro *Router) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:    "/api/auth/email-otp/login",
-		Methods: []string{http.MethodPost},
-		Handler: http.HandlerFunc(ro.HandleLogin),
-	}}
 }
 
 func (ro *Router) HandleLogin(w http.ResponseWriter, r *http.Request) {

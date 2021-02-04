@@ -5,7 +5,6 @@ import (
 
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
-	"go.uber.org/fx"
 )
 
 type Router struct {
@@ -16,30 +15,31 @@ type Router struct {
 }
 
 type RouterParams struct {
-	fx.In
-
 	RW     chttp.ReaderWriter
 	Logger clogger.Logger
 
 	Auth Svc
 }
 
-func NewRouter(p RouterParams) *Router {
-	return &Router{
+func NewRouter(p RouterParams) chttp.Router {
+	ro := &Router{
 		rw:     p.RW,
 		logger: p.Logger,
-
-		auth: p.Auth,
+		auth:   p.Auth,
 	}
-}
 
-func NewSignup(ro *Router) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:            "/api/auth/phone/signup",
-		MiddlewareFuncs: []chttp.MiddlewareFunc{},
-		Methods:         []string{http.MethodPost},
-		Handler:         http.HandlerFunc(ro.HandleSignup),
-	}}
+	return chttp.NewRouter([]chttp.Route{
+		{
+			Path: "/api/auth/phone/signup",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.HandleSignup),
+		},
+		{
+			Path:            "/api/auth/phone/login",
+			Methods:         []string{http.MethodPost},
+			Handler:         http.HandlerFunc(ro.HandleLogin),
+		},
+	})
 }
 
 func (ro *Router) HandleSignup(w http.ResponseWriter, r *http.Request) {
@@ -59,15 +59,6 @@ func (ro *Router) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ro.rw.OK(w, nil)
-}
-
-func NewLogin(ro *Router) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:            "/api/auth/phone/login",
-		MiddlewareFuncs: []chttp.MiddlewareFunc{},
-		Methods:         []string{http.MethodPost},
-		Handler:         http.HandlerFunc(ro.HandleLogin),
-	}}
 }
 
 func (ro *Router) HandleLogin(w http.ResponseWriter, r *http.Request) {

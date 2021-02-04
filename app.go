@@ -39,6 +39,7 @@ func (a *App) AddConfigs(configs ...interface{}) {
 	}
 }
 
+// Start starts the application and blocks until it receives a kill signal. Then, it shuts down gracefully.
 func (a *App) Start(funcs ...interface{}) {
 	for i := range funcs {
 		a.opts = append(a.opts, fx.Invoke(funcs[i]))
@@ -47,6 +48,7 @@ func (a *App) Start(funcs ...interface{}) {
 	fx.New(a.opts...).Run()
 }
 
+// Run runs all of the provided funcs in the app container and shuts down gracefully.
 func (a *App) Run(funcs ...interface{}) {
 	for i := range funcs {
 		a.opts = append(a.opts, fx.Invoke(funcs[i]))

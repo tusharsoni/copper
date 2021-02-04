@@ -1,28 +1,43 @@
 package cauth
 
 import (
+	"github.com/tusharsoni/copper"
+	"github.com/tusharsoni/copper/cacl"
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
 	"gorm.io/gorm"
 )
 
 type Module struct {
-	Svc        Svc
-	Middleware Middleware
+	copper.Module
+
+	Svc               Svc
+	SessionMiddleware SessionMiddleware
 }
 
-func NewModule(db *gorm.DB, logger clogger.Logger) *Module {
+type NewParams struct {
+	copper.ModuleParams
+
+	DB     *gorm.DB
+	RW     chttp.ReaderWriter
+	Logger clogger.Logger
+
+	ACL cacl.Svc `optional:"true"`
+}
+
+func New(p NewParams) Module {
 	var (
-		svc = NewSvc(NewSQLRepo(db))
-		mw  = NewAuthMiddleware(MiddlewareParams{
-			RW:     chttp.NewJSONReaderWriter(logger),
+		svc = NewSvc(NewSQLRepo(p.DB))
+		mw  = NewSessionMiddleware(NewSessionMiddlewareParams{
+			RW:     p.RW,
 			Svc:    svc,
-			Logger: logger,
+			Logger: p.Logger,
+			ACL:    p.ACL,
 		})
 	)
 
-	return &Module{
-		Svc:        svc,
-		Middleware: mw,
+	return Module{
+		Svc:               svc,
+		SessionMiddleware: mw,
 	}
 }

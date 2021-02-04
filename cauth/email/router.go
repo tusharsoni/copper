@@ -10,7 +10,6 @@ import (
 
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
-	"go.uber.org/fx"
 )
 
 type Router struct {
@@ -18,53 +17,78 @@ type Router struct {
 	logger clogger.Logger
 
 	auth   Svc
-	authMW cauth.Middleware
 	config Config
 }
 
-type RouterParams struct {
-	fx.In
-
+type NewRouterParams struct {
 	RW     chttp.ReaderWriter
 	Logger clogger.Logger
 
-	Auth   Svc
-	AuthMW cauth.Middleware
-	Config Config
+	Auth      Svc
+	SessionMW chttp.MiddlewareFunc
+	Config    Config
 }
 
-func NewRouter(p RouterParams) *Router {
-	return &Router{
+func NewRouter(p NewRouterParams) chttp.Router {
+	ro := &Router{
 		rw:     p.RW,
 		logger: p.Logger,
-
 		auth:   p.Auth,
-		authMW: p.AuthMW,
 		config: p.Config,
 	}
-}
 
-func (ro *Router) Routes() []chttp.Route {
-	return []chttp.Route{
-		NewSignupRoute(ro).Route,
-		NewLoginRoute(ro).Route,
-		NewVerifyUserRoute(ro, ro.authMW).Route,
-		NewResendVerificationCodeRoute(ro, ro.authMW).Route,
-		NewChangePasswordRoute(ro).Route,
-		NewResetPasswordRoute(ro).Route,
-		NewAddCredentialsRoute(ro, ro.authMW).Route,
-		NewChangeEmailRoute(ro, ro.authMW).Route,
-		NewGetCredentialsRoute(ro, ro.authMW).Route,
-	}
-}
-
-func NewSignupRoute(ro *Router) chttp.RouteResult {
-	route := chttp.Route{
-		Path:    "/api/auth/email/signup",
-		Methods: []string{http.MethodPost},
-		Handler: http.HandlerFunc(ro.Signup),
-	}
-	return chttp.RouteResult{Route: route}
+	return chttp.NewRouter([]chttp.Route{
+		{
+			Path:    "/api/auth/email/signup",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.Signup),
+		},
+		{
+			Path:    "/api/auth/email/login",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.Login),
+		},
+		{
+			MiddlewareFuncs: []chttp.MiddlewareFunc{p.SessionMW},
+			Path:            "/api/auth/email/verify",
+			Methods:         []string{http.MethodPost},
+			Handler:         http.HandlerFunc(ro.VerifyUser),
+		},
+		{
+			MiddlewareFuncs: []chttp.MiddlewareFunc{p.SessionMW},
+			Path:            "/api/auth/email/resend-verification-code",
+			Methods:         []string{http.MethodPost},
+			Handler:         http.HandlerFunc(ro.ResendVerificationCode),
+		},
+		{
+			Path:    "/api/auth/email/change-password",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.ChangePassword),
+		},
+		{
+			Path:    "/api/auth/email/reset-password",
+			Methods: []string{http.MethodPost},
+			Handler: http.HandlerFunc(ro.ResetPassword),
+		},
+		{
+			Path:            "/api/auth/email/credentials",
+			MiddlewareFuncs: []chttp.MiddlewareFunc{p.SessionMW},
+			Methods:         []string{http.MethodPost},
+			Handler:         http.HandlerFunc(ro.HandleAddCredentials),
+		},
+		{
+			Path:            "/api/auth/email/change-email",
+			MiddlewareFuncs: []chttp.MiddlewareFunc{p.SessionMW},
+			Methods:         []string{http.MethodPost},
+			Handler:         http.HandlerFunc(ro.HandleChangeEmail),
+		},
+		{
+			Path:            "/api/auth/email/credentials",
+			MiddlewareFuncs: []chttp.MiddlewareFunc{p.SessionMW},
+			Methods:         []string{http.MethodGet},
+			Handler:         http.HandlerFunc(ro.HandleGetCredentials),
+		},
+	})
 }
 
 func (ro *Router) Signup(w http.ResponseWriter, r *http.Request) {
@@ -93,15 +117,6 @@ func (ro *Router) Signup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func NewLoginRoute(ro *Router) chttp.RouteResult {
-	route := chttp.Route{
-		Path:    "/api/auth/email/login",
-		Methods: []string{http.MethodPost},
-		Handler: http.HandlerFunc(ro.Login),
-	}
-	return chttp.RouteResult{Route: route}
-}
-
 func (ro *Router) Login(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email    string `json:"email" valid:"email"`
@@ -128,16 +143,6 @@ func (ro *Router) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func NewVerifyUserRoute(ro *Router, mw cauth.Middleware) chttp.RouteResult {
-	route := chttp.Route{
-		MiddlewareFuncs: []chttp.MiddlewareFunc{mw.VerifySessionToken},
-		Path:            "/api/auth/email/verify",
-		Methods:         []string{http.MethodPost},
-		Handler:         http.HandlerFunc(ro.VerifyUser),
-	}
-	return chttp.RouteResult{Route: route}
-}
-
 func (ro *Router) VerifyUser(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		VerificationCode string `json:"verification_code" valid:"printableascii"`
@@ -162,16 +167,6 @@ func (ro *Router) VerifyUser(w http.ResponseWriter, r *http.Request) {
 	ro.rw.OK(w, nil)
 }
 
-func NewResendVerificationCodeRoute(ro *Router, mw cauth.Middleware) chttp.RouteResult {
-	route := chttp.Route{
-		MiddlewareFuncs: []chttp.MiddlewareFunc{mw.VerifySessionToken},
-		Path:            "/api/auth/email/resend-verification-code",
-		Methods:         []string{http.MethodPost},
-		Handler:         http.HandlerFunc(ro.ResendVerificationCode),
-	}
-	return chttp.RouteResult{Route: route}
-}
-
 func (ro *Router) ResendVerificationCode(w http.ResponseWriter, r *http.Request) {
 	userUUID := cauth.GetCurrentUserUUID(r.Context())
 
@@ -183,15 +178,6 @@ func (ro *Router) ResendVerificationCode(w http.ResponseWriter, r *http.Request)
 	}
 
 	ro.rw.OK(w, nil)
-}
-
-func NewChangePasswordRoute(ro *Router) chttp.RouteResult {
-	route := chttp.Route{
-		Path:    "/api/auth/email/change-password",
-		Methods: []string{http.MethodPost},
-		Handler: http.HandlerFunc(ro.ChangePassword),
-	}
-	return chttp.RouteResult{Route: route}
 }
 
 func (ro *Router) ChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -215,15 +201,6 @@ func (ro *Router) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	ro.rw.OK(w, nil)
 }
 
-func NewResetPasswordRoute(ro *Router) chttp.RouteResult {
-	route := chttp.Route{
-		Path:    "/api/auth/email/reset-password",
-		Methods: []string{http.MethodPost},
-		Handler: http.HandlerFunc(ro.ResetPassword),
-	}
-	return chttp.RouteResult{Route: route}
-}
-
 func (ro *Router) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email" valid:"email"`
@@ -241,15 +218,6 @@ func (ro *Router) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ro.rw.OK(w, nil)
-}
-
-func NewAddCredentialsRoute(ro *Router, auth cauth.Middleware) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:            "/api/auth/email/credentials",
-		MiddlewareFuncs: []chttp.MiddlewareFunc{auth.VerifySessionToken},
-		Methods:         []string{http.MethodPost},
-		Handler:         http.HandlerFunc(ro.HandleAddCredentials),
-	}}
 }
 
 func (ro *Router) HandleAddCredentials(w http.ResponseWriter, r *http.Request) {
@@ -276,15 +244,6 @@ func (ro *Router) HandleAddCredentials(w http.ResponseWriter, r *http.Request) {
 	ro.rw.OK(w, nil)
 }
 
-func NewChangeEmailRoute(ro *Router, auth cauth.Middleware) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:            "/api/auth/email/change-email",
-		MiddlewareFuncs: []chttp.MiddlewareFunc{auth.VerifySessionToken},
-		Methods:         []string{http.MethodPost},
-		Handler:         http.HandlerFunc(ro.HandleChangeEmail),
-	}}
-}
-
 func (ro *Router) HandleChangeEmail(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx      = r.Context()
@@ -302,15 +261,6 @@ func (ro *Router) HandleChangeEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ro.rw.OK(w, nil)
-}
-
-func NewGetCredentialsRoute(ro *Router, auth cauth.Middleware) chttp.RouteResult {
-	return chttp.RouteResult{Route: chttp.Route{
-		Path:            "/api/auth/email/credentials",
-		MiddlewareFuncs: []chttp.MiddlewareFunc{auth.VerifySessionToken},
-		Methods:         []string{http.MethodGet},
-		Handler:         http.HandlerFunc(ro.HandleGetCredentials),
-	}}
 }
 
 func (ro *Router) HandleGetCredentials(w http.ResponseWriter, r *http.Request) {

@@ -10,7 +10,6 @@ import (
 	"github.com/tusharsoni/copper/clogger"
 	"github.com/tusharsoni/copper/cmailer"
 	"github.com/tusharsoni/copper/crandom"
-	"go.uber.org/fx"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -36,8 +35,6 @@ type svc struct {
 }
 
 type SvcParams struct {
-	fx.In
-
 	Auth   cauth.Svc
 	Repo   Repo
 	Mailer cmailer.Mailer

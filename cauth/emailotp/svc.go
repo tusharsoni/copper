@@ -28,17 +28,24 @@ type svc struct {
 	verificationEmailTemplate *template.Template
 }
 
-func NewSvc(auth cauth.Svc, repo Repo, mailer cmailer.Mailer, config Config) (Svc, error) {
-	verificationEmailTemplate, err := template.New("VerificationEmail").Parse(config.VerificationEmail.BodyTemplate)
+type NewSvcParams struct {
+	Auth   cauth.Svc
+	Repo   Repo
+	Mailer cmailer.Mailer
+	Config Config
+}
+
+func NewSvc(p NewSvcParams) (Svc, error) {
+	verificationEmailTemplate, err := template.New("VerificationEmail").Parse(p.Config.VerificationEmail.BodyTemplate)
 	if err != nil {
 		return nil, cerror.New(err, "failed to parse verification email template", nil)
 	}
 
 	return &svc{
-		auth:   auth,
-		repo:   repo,
-		mailer: mailer,
-		config: config,
+		auth:   p.Auth,
+		repo:   p.Repo,
+		mailer: p.Mailer,
+		config: p.Config,
 
 		verificationEmailTemplate: verificationEmailTemplate,
 	}, nil

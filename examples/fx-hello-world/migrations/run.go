@@ -4,7 +4,6 @@ import (
 	"github.com/tusharsoni/copper"
 	"github.com/tusharsoni/copper/cacl"
 	"github.com/tusharsoni/copper/cauth"
-	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
 	"github.com/tusharsoni/copper/cqueue"
 	"github.com/tusharsoni/copper/csql"
@@ -12,6 +11,11 @@ import (
 
 func main() {
 	var app = copper.New()
+
+	app.AddModules(
+		clogger.New,
+		csql.New,
+	)
 
 	app.AddConfigs(
 		csql.Config{
@@ -22,20 +26,9 @@ func main() {
 		},
 	)
 
-	app.AddModules(
-		clogger.New,
-		chttp.New,
-		csql.New,
-		cauth.New,
-		cqueue.New,
-		cacl.New,
-
-		NewLogTask,
-		NewAppRouter,
-	)
-
-	app.Start(
-		cqueue.StartBackgroundWorkers,
-		chttp.StartServer,
+	app.Run(
+		cacl.RunMigrations,
+		cauth.RunMigrations,
+		cqueue.RunMigrations,
 	)
 }

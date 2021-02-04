@@ -70,6 +70,10 @@ func StartServer(p StartServerParams) {
 	muxHandler.Handle("/", muxRouter)
 
 	go func() {
+		p.Logger.WithTags(map[string]interface{}{
+			"port": config.Port,
+		}).Info("Starting http server..")
+
 		err := httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			p.Logger.Error("Failed to start http server", err)

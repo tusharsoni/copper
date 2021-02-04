@@ -9,88 +9,68 @@ import (
 
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
-	"go.uber.org/fx"
 )
 
-type Middleware interface {
-	VerifySessionToken(next http.Handler) http.Handler
-}
+type SessionMiddleware chttp.MiddlewareFunc
 
-type middleware struct {
-	rw     chttp.ReaderWriter
-	svc    Svc
-	acl    cacl.Svc
-	logger clogger.Logger
-}
-
-type MiddlewareParams struct {
-	fx.In
-
+type NewSessionMiddlewareParams struct {
 	RW     chttp.ReaderWriter
 	Svc    Svc
 	Logger clogger.Logger
-
-	ACL cacl.Svc `optional:"true"`
+	ACL    cacl.Svc
 }
 
-func NewAuthMiddleware(p MiddlewareParams) Middleware {
-	return &middleware{
-		rw:     p.RW,
-		svc:    p.Svc,
-		acl:    p.ACL,
-		logger: p.Logger,
-	}
-}
-
-func (m *middleware) VerifySessionToken(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userUUID, sessionToken, ok := r.BasicAuth()
-		if !ok || userUUID == "" || sessionToken == "" {
-			m.rw.Unauthorized(w)
-			return
-		}
-
-		ok, err := m.svc.VerifySessionToken(r.Context(), userUUID, sessionToken)
-		if err != nil {
-			m.logger.WithTags(map[string]interface{}{
-				"userUUID": userUUID,
-			}).Error("Failed to verify session token", err)
-			m.rw.InternalErr(w)
-			return
-		}
-		if !ok {
-			m.rw.Unauthorized(w)
-			return
-		}
-
-		impersonatedUserUUID := r.Header.Get("x-user-uuid")
-		if impersonatedUserUUID != "" {
-			if m.acl == nil {
-				m.logger.Error("Failed to impersonate user", errors.New("acl is not configured"))
-				m.rw.InternalErr(w)
+func NewSessionMiddleware(p NewSessionMiddlewareParams) SessionMiddleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userUUID, sessionToken, ok := r.BasicAuth()
+			if !ok || userUUID == "" || sessionToken == "" {
+				p.RW.Unauthorized(w)
 				return
 			}
 
-			ok, err := m.acl.UserHasPermission(r.Context(), userUUID, "cauth/session", "impersonate")
+			ok, err := p.Svc.VerifySessionToken(r.Context(), userUUID, sessionToken)
 			if err != nil {
-				m.logger.WithTags(map[string]interface{}{
+				p.Logger.WithTags(map[string]interface{}{
 					"userUUID": userUUID,
-				}).Error("Failed to impersonate user", err)
-				m.rw.InternalErr(w)
+				}).Error("Failed to verify session token", err)
+				p.RW.InternalErr(w)
 				return
 			}
-
 			if !ok {
-				m.logger.WithTags(map[string]interface{}{
-					"userUUID": userUUID,
-				}).Error("Failed to impersonate user", errors.New("user does not have permission to impersonate"))
-				m.rw.InternalErr(w)
+				p.RW.Unauthorized(w)
 				return
 			}
 
-			userUUID = impersonatedUserUUID
-		}
+			impersonatedUserUUID := r.Header.Get("x-user-uuid")
+			if impersonatedUserUUID != "" {
+				if p.ACL == nil {
+					p.Logger.Error("Failed to impersonate user", errors.New("acl is not configured"))
+					p.RW.InternalErr(w)
+					return
+				}
 
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKeySession, userUUID)))
-	})
+				ok, err := p.ACL.UserHasPermission(r.Context(), userUUID, "cauth/session", "impersonate")
+				if err != nil {
+					p.Logger.WithTags(map[string]interface{}{
+						"userUUID": userUUID,
+					}).Error("Failed to impersonate user", err)
+					p.RW.InternalErr(w)
+					return
+				}
+
+				if !ok {
+					p.Logger.WithTags(map[string]interface{}{
+						"userUUID": userUUID,
+					}).Error("Failed to impersonate user", errors.New("user does not have permission to impersonate"))
+					p.RW.InternalErr(w)
+					return
+				}
+
+				userUUID = impersonatedUserUUID
+			}
+
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKeySession, userUUID)))
+		})
+	}
 }

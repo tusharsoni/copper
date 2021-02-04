@@ -1,22 +1,27 @@
 package emailotp
 
 import (
+	"github.com/tusharsoni/copper"
 	"github.com/tusharsoni/copper/cauth"
 	"github.com/tusharsoni/copper/cerror"
 	"github.com/tusharsoni/copper/chttp"
 	"github.com/tusharsoni/copper/clogger"
 	"github.com/tusharsoni/copper/cmailer"
-	"go.uber.org/fx"
 	"gorm.io/gorm"
 )
 
 type Module struct {
+	copper.Module
+
 	Svc    Svc
-	Routes []chttp.Route
+	Router chttp.Router
 }
 
-type NewModuleParams struct {
+type NewParams struct {
+	copper.ModuleParams
+
 	Auth   cauth.Svc
+	RW     chttp.ReaderWriter
 	Mailer cmailer.Mailer
 	Logger clogger.Logger
 	Config Config
@@ -24,33 +29,23 @@ type NewModuleParams struct {
 	DB *gorm.DB
 }
 
-func NewModule(p NewModuleParams) (*Module, error) {
-	svc, err := NewSvc(p.Auth, NewSQLRepo(p.DB), p.Mailer, p.Config)
+func New(p NewParams) (Module, error) {
+	svc, err := NewSvc(NewSvcParams{
+		Auth:   p.Auth,
+		Repo:   NewSQLRepo(p.DB),
+		Mailer: p.Mailer,
+		Config: p.Config,
+	})
 	if err != nil {
-		return nil, cerror.New(err, "failed to create service", nil)
+		return Module{}, cerror.New(err, "failed to create service", nil)
 	}
 
-	router := NewRouter(RouterParams{
-		RW:     chttp.NewJSONReaderWriter(p.Logger),
-		Logger: p.Logger,
-		Auth:   svc,
-	})
-
-	return &Module{
-		Svc:    svc,
-		Routes: router.Routes(),
+	return Module{
+		Svc: svc,
+		Router: NewRouter(NewRouterParams{
+			RW:     p.RW,
+			Logger: p.Logger,
+			Auth:   svc,
+		}),
 	}, nil
 }
-
-var Fx = fx.Provide(
-	NewSQLRepo,
-	NewSvc,
-
-	NewRouter,
-	NewLogin,
-	NewSignup,
-)
-
-var FxMigrations = fx.Invoke(
-	RunMigrations,
-)
